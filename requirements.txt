@@ -2,4 +2,3 @@ Flask==3.1.1
 pytubefix==11.2.0
 gunicorn==23.0.0
 imageio-ffmpeg==0.6.0
-yt-dlp==2026.8.19

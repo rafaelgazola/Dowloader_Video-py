@@ -12,8 +12,6 @@ from imageio_ffmpeg import get_ffmpeg_exe
 from pytubefix import YouTube
 from pytubefix.exceptions import BotDetection, VideoUnavailable
 from werkzeug.utils import secure_filename
-from yt_dlp import YoutubeDL
-from yt_dlp.utils import DownloadError
 
 
 app = Flask(__name__)
@@ -80,42 +78,6 @@ def abrir_video(url):
     raise ultimo_bloqueio
 
 
-def baixar_com_ytdlp(url, formato, pasta):
-    """Segunda tentativa com um extrator independente do pytubefix."""
-    opcoes = {
-        "format": "bestaudio/best" if formato == "mp3" else
-                  "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]",
-        "outtmpl": str(pasta / "origem.%(ext)s"),
-        "ffmpeg_location": get_ffmpeg_exe(),
-        "merge_output_format": "mp4",
-        "noplaylist": True,
-        "quiet": True,
-        "noprogress": True,
-        "no_warnings": True,
-    }
-    proxy_url = os.getenv("YOUTUBE_PROXY_URL")
-    if proxy_url:
-        opcoes["proxy"] = proxy_url
-    with YoutubeDL(opcoes) as ydl:
-        info = ydl.extract_info(url, download=True)
-    if formato == "mp3":
-        origem = next((item for item in pasta.glob("origem.*") if item.is_file()), None)
-        if origem is None:
-            raise ValueError("Não foi possível preparar o áudio.")
-        arquivo = pasta / "pronto.mp3"
-        ffmpeg("Não foi possível converter o áudio deste vídeo.",
-               "-i", origem, "-vn", "-codec:a", "libmp3lame", "-q:a", "2", arquivo)
-        origem.unlink()
-        tipo = "audio/mpeg"
-    else:
-        arquivo = pasta / "origem.mp4"
-        if not arquivo.is_file():
-            raise ValueError("Não foi possível preparar o vídeo MP4.")
-        tipo = "video/mp4"
-    nome = (secure_filename(info.get("title", ""))[:120].rstrip("._") or "video") + f".{formato}"
-    return arquivo, nome, tipo
-
-
 @app.get("/")
 def index():
     return render_template("index.html")
@@ -123,20 +85,7 @@ def index():
 
 @app.get("/health")
 def health():
-    resposta = jsonify(status="ok")
-    resposta.headers["X-Downloader-Backend"] = "yt-dlp-fallback"
-    return resposta
-
-
-@app.get("/_probe_ytdlp")
-def probe_ytdlp():
-    """Diagnóstico temporário para o vídeo que falha no Render."""
-    try:
-        with YoutubeDL({"quiet": True, "no_warnings": True, "noplaylist": True}) as ydl:
-            info = ydl.extract_info("https://www.youtube.com/watch?v=VtQ4w3ky-8c", download=False)
-        return jsonify(title=info.get("title"), formats=len(info.get("formats", [])))
-    except DownloadError as exc:
-        return jsonify(error=str(exc)[-300:]), 502
+    return jsonify(status="ok")
 
 
 @app.post("/download")
@@ -151,22 +100,7 @@ def download():
         if formato not in {"mp4", "mp3"}:
             raise ValueError("Escolha vídeo MP4 ou áudio MP3.")
 
-        try:
-            yt, streams = abrir_video(url)
-        except BotDetection:
-            app.logger.warning("Tentando yt-dlp após bloqueio do pytubefix")
-            pasta = Path(tempfile.mkdtemp(prefix="youtube-download-"))
-            try:
-                arquivo, nome, tipo = baixar_com_ytdlp(url, formato, pasta)
-            except DownloadError:
-                app.logger.warning("yt-dlp também não conseguiu acessar o vídeo", exc_info=True)
-                raise BotDetection(parse_qs(urlsplit(url).query)["v"][0]) from None
-            resposta = send_file(arquivo, as_attachment=True, download_name=nome, mimetype=tipo)
-            resposta.direct_passthrough = False
-            resposta.call_on_close(lambda: shutil.rmtree(pasta, ignore_errors=True))
-            resposta.set_cookie("download_ready", "1", max_age=60, samesite="Lax")
-            enviando = True
-            return resposta
+        yt, streams = abrir_video(url)
         if yt.vid_info.get("videoDetails", {}).get("isLiveContent"):
             raise ValueError("Transmissões ao vivo não são suportadas.")
         pasta = Path(tempfile.mkdtemp(prefix="youtube-download-"))
