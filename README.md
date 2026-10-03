@@ -2,7 +2,7 @@
 
 Uma página simples para colar o link de **um vídeo público do YouTube** e receber MP4 ou MP3 no navegador. Não há limite de duração ou tamanho definido no aplicativo.
 
-No MP4, o app escolhe a faixa de maior resolução disponível. Se ela vier sem som, baixa o áudio separadamente e une as faixas com FFmpeg, **sem recodificar o vídeo**. No MP3, converte a faixa de áudio. O executável do FFmpeg vem junto com `imageio-ffmpeg`; você não precisa instalá-lo separadamente. Os arquivos ficam em uma pasta temporária e são removidos após o envio.
+No MP4, o app escolhe a faixa de maior resolução disponível. Se ela vier sem som, baixa o áudio separadamente e une as faixas com FFmpeg, **sem recodificar o vídeo**. No MP3, converte a faixa de áudio. No Windows e no Render, o executável do FFmpeg vem junto com `imageio-ffmpeg`; no Android, usa o pacote `ffmpeg` do Termux. Os arquivos ficam em uma pasta temporária e são removidos após o envio.
 
 ## Rodar no VS Code (Windows)
 
@@ -16,6 +16,40 @@ python app.py
 ```
 
 Se a ativação for bloqueada, rode `Set-ExecutionPolicy -Scope Process Bypass` no mesmo terminal. Acesse **http://127.0.0.1:5000**. Teste as duas opções com o link de um vídeo público. A rota **http://127.0.0.1:5000/health** retorna `{"status":"ok"}`.
+
+## Rodar no Android quando precisar
+
+Esta opção é gratuita e não precisa deixar um computador ligado em casa. O download usa a conexão do celular, então o Termux precisa ficar rodando até terminar. Instale o [Termux pelo F-Droid](https://f-droid.org/en/packages/com.termux/) ou pela [página oficial do projeto](https://github.com/termux/termux-app); a versão da Play Store pode ter limitações.
+
+No Termux, execute uma vez:
+
+```sh
+pkg update && pkg upgrade
+pkg install python ffmpeg git
+git clone https://github.com/rafaelgazola/Dowloader_Video-py.git
+cd Dowloader_Video-py
+python -m pip install -r requirements-android.txt
+```
+
+Para usar depois, abra o Termux e execute:
+
+```sh
+cd Dowloader_Video-py
+python app.py
+```
+
+Abra **http://127.0.0.1:5000** no navegador do celular. Para encerrar, volte ao Termux e pressione **Ctrl+C**. Se o Android encerrar o Termux durante um download, desative a otimização de bateria para o aplicativo.
+
+### Abrir em outro PC enquanto o celular está rodando
+
+Abra uma **segunda sessão** no Termux e execute:
+
+```sh
+pkg install cloudflared
+cloudflared tunnel --url http://localhost:5000 --allowed-mail seu-email@exemplo.com
+```
+
+Troque o endereço pelo seu email. Abra no PC o link `https://...trycloudflare.com` exibido pelo comando e confirme o código enviado ao email. O link é temporário, muda a cada execução e só funciona enquanto `python app.py` e `cloudflared` estiverem rodando no celular. O acesso por email protege a página, que permite iniciar downloads. [Cloudflare Quick Tunnels](https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/) são voltados a testes e não garantem disponibilidade permanente.
 
 ## Publicar no Render
 

@@ -8,10 +8,14 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
 from flask import Flask, jsonify, render_template, request, send_file
-from imageio_ffmpeg import get_ffmpeg_exe
 from pytubefix import YouTube
 from pytubefix.exceptions import BotDetection, VideoUnavailable
 from werkzeug.utils import secure_filename
+
+try:
+    from imageio_ffmpeg import get_ffmpeg_exe
+except ImportError:
+    get_ffmpeg_exe = None
 
 
 app = Flask(__name__)
@@ -51,8 +55,11 @@ def baixar(stream, pasta, nome):
 
 def ffmpeg(mensagem, *args):
     try:
+        executavel = get_ffmpeg_exe() if get_ffmpeg_exe else shutil.which("ffmpeg")
+        if not executavel:
+            raise OSError("FFmpeg nao encontrado")
         subprocess.run(
-            [get_ffmpeg_exe(), "-nostdin", "-hide_banner", "-loglevel", "error", "-y", *map(str, args)],
+            [executavel, "-nostdin", "-hide_banner", "-loglevel", "error", "-y", *map(str, args)],
             check=True, shell=False, capture_output=True,
         )
     except subprocess.CalledProcessError as exc:
