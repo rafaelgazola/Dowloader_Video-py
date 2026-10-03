@@ -123,7 +123,20 @@ def index():
 
 @app.get("/health")
 def health():
-    return jsonify(status="ok")
+    resposta = jsonify(status="ok")
+    resposta.headers["X-Downloader-Backend"] = "yt-dlp-fallback"
+    return resposta
+
+
+@app.get("/_probe_ytdlp")
+def probe_ytdlp():
+    """Diagnóstico temporário para o vídeo que falha no Render."""
+    try:
+        with YoutubeDL({"quiet": True, "no_warnings": True, "noplaylist": True}) as ydl:
+            info = ydl.extract_info("https://www.youtube.com/watch?v=VtQ4w3ky-8c", download=False)
+        return jsonify(title=info.get("title"), formats=len(info.get("formats", [])))
+    except DownloadError as exc:
+        return jsonify(error=str(exc)[-300:]), 502
 
 
 @app.post("/download")
