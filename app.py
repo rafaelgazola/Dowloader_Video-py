@@ -117,6 +117,7 @@ def download():
         enviando = True
         return resposta
     except VideoUnavailable:
+        app.logger.warning("YouTube reported an unavailable video", exc_info=True)
         erro = "Este vídeo está privado ou indisponível."
     except ValueError as exc:
         erro = str(exc)
