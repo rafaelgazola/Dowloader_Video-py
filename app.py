@@ -1,4 +1,5 @@
 import logging
+import os
 import re
 import shutil
 import subprocess
@@ -64,8 +65,10 @@ def ffmpeg(mensagem, *args):
 def abrir_video(url):
     """Tenta clientes suportados quando o YouTube bloqueia um deles."""
     ultimo_bloqueio = None
+    proxy_url = os.getenv("YOUTUBE_PROXY_URL")
+    proxies = {"http": proxy_url, "https": proxy_url} if proxy_url else None
     for client in ("VISION_OS", "WEB", "ANDROID", "IOS", "TV"):
-        yt = YouTube(url, client=client)
+        yt = YouTube(url, client=client, proxies=proxies)
         try:
             streams = yt.streams
             return yt, streams
@@ -131,7 +134,7 @@ def download():
         enviando = True
         return resposta
     except BotDetection:
-        erro = "O YouTube bloqueou o acesso do servidor. Tente novamente mais tarde."
+        erro = "O YouTube bloqueou o acesso deste servidor. Tente rodar o app localmente ou configurar outra conexão de saída."
     except VideoUnavailable:
         app.logger.warning("YouTube reported an unavailable video", exc_info=True)
         erro = "Este vídeo está privado ou indisponível."

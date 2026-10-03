@@ -30,7 +30,9 @@ git remote add origin https://github.com/SEU_USUARIO/SEU_REPOSITORIO.git
 git push -u origin main
 ```
 
-No [Render](https://dashboard.render.com/), escolha **New > Blueprint**, conecte o repositório e confirme. O `render.yaml` usa o `Dockerfile`, que já instala Python, FFmpeg e as dependências. O serviço abre na URL fornecida pelo Render. A verificação de disponibilidade usa a conexão TCP padrão do Render, para que um download longo não bloqueie uma checagem HTTP em `/health`.
+No [Render](https://dashboard.render.com/), escolha **New > Blueprint**, conecte o repositório e confirme. O `render.yaml` usa o `Dockerfile`, que instala Python e as dependências; o FFmpeg vem no pacote `imageio-ffmpeg`. O serviço atual, [youtube-downloader](https://youtube-downloader-0d90.onrender.com), foi criado diretamente no Render com runtime Python, `pip install -r requirements.txt` e `gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --timeout 0`. A verificação de disponibilidade usa a conexão TCP padrão do Render, para que um download longo não bloqueie uma checagem HTTP em `/health`.
+
+O YouTube pode identificar o IP de saída do Render como bot. Nesse caso, `/health` continua respondendo, mas o download falha. Para usar outra conexão de saída, configure `YOUTUBE_PROXY_URL` nas variáveis de ambiente do serviço Render com a URL de um proxy HTTP(S) confiável (por exemplo, `http://usuario:senha@host:porta`). Guarde essa URL apenas no Render, nunca no repositório. O funcionamento depende de o YouTube aceitar o IP do proxy. Sem um proxy aceito, rode o app localmente ou em uma rede cujo IP seja aceito pelo YouTube.
 
 ## Arquivos
 
@@ -46,7 +48,7 @@ O aplicativo processa um vídeo por vez. Playlists, lives, vídeos privados e v�
 
 Para sets longos, há três caminhos simples:
 
-- **Render gratuito:** experimente primeiro. Funciona se o arquivo couber no espaço temporário e o processamento mais envio terminar dentro do [limite de até 100 minutos por resposta HTTP](https://render.com/docs/render-vs-vercel-comparison). O [serviço gratuito pode reiniciar e seus arquivos temporários não persistem](https://render.com/docs/free).
+- **Render gratuito:** depende de o YouTube aceitar o IP de saída, além de o arquivo caber no espaço temporário e o processamento mais envio terminar dentro do [limite de até 100 minutos por resposta HTTP](https://render.com/docs/render-vs-vercel-comparison). O [serviço gratuito pode reiniciar e seus arquivos temporários não persistem](https://render.com/docs/free).
 - **Render pago:** mais recursos de CPU/memória e, se necessário, disco persistente. O limite da resposta HTTP ainda se aplica.
 - **Local ou VPS com disco suficiente:** melhor opção para sets realmente enormes ou downloads que podem passar do limite de tempo do Render. O mesmo projeto roda sem mudanças na lógica.
 
