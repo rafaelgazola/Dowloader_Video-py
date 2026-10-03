@@ -9,7 +9,7 @@ from urllib.parse import parse_qs, urlsplit
 from flask import Flask, jsonify, render_template, request, send_file
 from imageio_ffmpeg import get_ffmpeg_exe
 from pytubefix import YouTube
-from pytubefix.exceptions import VideoUnavailable
+from pytubefix.exceptions import BotDetection, VideoUnavailable
 from werkzeug.utils import secure_filename
 
 
@@ -61,6 +61,20 @@ def ffmpeg(mensagem, *args):
         raise ValueError("Não foi possível iniciar o FFmpeg.") from None
 
 
+def abrir_video(url):
+    """Tenta clientes suportados quando o YouTube bloqueia um deles."""
+    ultimo_bloqueio = None
+    for client in ("VISION_OS", "WEB", "ANDROID", "IOS", "TV"):
+        yt = YouTube(url, client=client)
+        try:
+            streams = yt.streams
+            return yt, streams
+        except BotDetection as exc:
+            app.logger.warning("YouTube bloqueou o cliente %s", client)
+            ultimo_bloqueio = exc
+    raise ultimo_bloqueio
+
+
 @app.get("/")
 def index():
     return render_template("index.html")
@@ -83,17 +97,17 @@ def download():
         if formato not in {"mp4", "mp3"}:
             raise ValueError("Escolha vídeo MP4 ou áudio MP3.")
 
-        yt = YouTube(url, client="VISION_OS")
+        yt, streams = abrir_video(url)
         if yt.vid_info.get("videoDetails", {}).get("isLiveContent"):
             raise ValueError("Transmissões ao vivo não são suportadas.")
         pasta = Path(tempfile.mkdtemp(prefix="youtube-download-"))
 
         if formato == "mp4":
-            stream = yt.streams.filter(file_extension="mp4").order_by("resolution").desc().first()
+            stream = streams.filter(file_extension="mp4").order_by("resolution").desc().first()
             video = baixar(stream, pasta, "video.mp4")
             arquivo = video
             if not stream.is_progressive:
-                audio = baixar(yt.streams.get_audio_only(), pasta, "audio.mp4")
+                audio = baixar(streams.get_audio_only(), pasta, "audio.mp4")
                 arquivo = pasta / "pronto.mp4"
                 ffmpeg("Não foi possível unir vídeo e áudio deste vídeo.",
                        "-i", video, "-i", audio, "-map", "0:v:0", "-map", "1:a:0",
@@ -102,7 +116,7 @@ def download():
                 audio.unlink()
             tipo = "video/mp4"
         else:
-            audio = baixar(yt.streams.get_audio_only(), pasta, "audio.mp4")
+            audio = baixar(streams.get_audio_only(), pasta, "audio.mp4")
             arquivo = pasta / "pronto.mp3"
             ffmpeg("Não foi possível converter o áudio deste vídeo.",
                    "-i", audio, "-vn", "-codec:a", "libmp3lame", "-q:a", "2", arquivo)
@@ -116,6 +130,8 @@ def download():
         resposta.set_cookie("download_ready", "1", max_age=60, samesite="Lax")
         enviando = True
         return resposta
+    except BotDetection:
+        erro = "O YouTube bloqueou o acesso do servidor. Tente novamente mais tarde."
     except VideoUnavailable:
         app.logger.warning("YouTube reported an unavailable video", exc_info=True)
         erro = "Este vídeo está privado ou indisponível."
