@@ -1,6 +1,0 @@
-services:
-  - type: web
-    name: youtube-downloader
-    runtime: docker
-    plan: free
-    autoDeploy: true
