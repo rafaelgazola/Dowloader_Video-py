@@ -25,8 +25,6 @@ def youtube_url(link):
         if url.scheme not in {"http", "https"} or url.hostname not in YOUTUBE_HOSTS or url.port:
             raise ValueError
         query = parse_qs(url.query, keep_blank_values=True)
-        if "list" in query:
-            raise ValueError
         if url.hostname == "youtu.be":
             video_id = url.path.strip("/")
         elif url.path == "/watch":
